@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ポスティング地図">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#DD0B1B">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
+<link rel="icon" type="image/png" href="icon-192.png?v=1">
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<title>ポスティング塗り地図</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --red:#DD0B1B; --red-dark:#a30813; --ink:#111; --line:#e3e3e3; --bg:#fff; --soft:#f6f6f6;
+  --font:"Helvetica Neue",Helvetica,Arial,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font);
+  -webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh;width:100%}
+header{flex:none;background:var(--red);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 10px) max(14px,env(safe-area-inset-right,0px)) 10px max(14px,env(safe-area-inset-left,0px));
+  display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.02em;line-height:1.1}
+header small{display:block;font-size:11px;font-weight:400;opacity:.85;margin-top:3px}
+.rate{text-align:right;line-height:1}
+.rate b{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
+.rate span{font-size:14px;font-weight:700}
+.rate small{margin:4px 0 0;font-size:11px}
+#mapwrap{position:relative;flex:1 1 auto;min-height:0}
+#map{position:absolute;inset:0;background:#eceff1}
+.leaflet-container{font-family:var(--font)}
+#toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:900;background:rgba(17,17,17,.88);color:#fff;
+  font-size:13px;padding:8px 14px;border-radius:20px;max-width:88%;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+.fab{position:absolute;right:max(12px,env(safe-area-inset-right,0px));z-index:800;width:46px;height:46px;border-radius:50%;
+  border:1px solid var(--line);background:#fff;color:var(--ink);font-size:20px;box-shadow:0 2px 6px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-family:var(--font)}
+#btnLoc{bottom:14px}
+#btnGym{bottom:68px;font-size:12px;font-weight:700}
+footer{flex:none;background:#fff;border-top:1px solid var(--line);padding:8px max(10px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 8px) max(10px,env(safe-area-inset-left,0px))}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mode{appearance:none;border:2px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:8px 2px 7px;font-family:var(--font);
+  font-size:12px;font-weight:700;line-height:1.25;text-align:center}
+.mode i{display:block;font-style:normal;font-size:20px;line-height:1.1;margin-bottom:2px}
+.mode.on{border-color:var(--red);background:var(--red);color:#fff}
+.mode[data-mode="target"].on{background:#111;border-color:#111}
+.row{display:flex;gap:6px;margin-top:6px}
+.btn{flex:1;appearance:none;border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:10px;padding:10px 4px;font-family:var(--font);font-size:13px;font-weight:700}
+.btn:active{background:#e9e9e9}
+.stats{display:flex;justify-content:space-between;font-size:11px;color:#555;margin-top:6px;font-variant-numeric:tabular-nums}
+#sheet{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center}
+#sheet.on{display:flex}
+.panel{background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 16px) max(16px,env(safe-area-inset-left,0px))}
+.panel h2{margin:0 0 4px;font-size:18px}
+.panel p{margin:0 0 10px;font-size:12px;color:#555;line-height:1.5}
+.panel textarea{width:100%;height:110px;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;font-family:ui-monospace,Menlo,monospace;-webkit-user-select:text;user-select:text;resize:none}
+.panel .row .btn.red{background:var(--red);border-color:var(--red);color:#fff}
+.leaflet-control-attribution{font-size:9px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>ポスティング塗り地図</h1>
+      <small id="areaName">車尾小学校区</small>
+    </div>
+    <div class="rate"><b id="rate">0</b><span>%</span><small id="rateSub">配布済み</small></div>
+  </header>
+
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div id="toast"></div>
+    <button class="fab" id="btnGym" aria-label="ジムへ移動">ジム</button>
+    <button class="fab" id="btnLoc" aria-label="現在地へ移動">◎</button>
+  </div>
+
+  <footer>
+    <div class="modes">
+      <button class="mode on" data-mode="move"><i>✋</i>地図を動かす</button>
+      <button class="mode" data-mode="paint"><i>🖍</i>赤で塗る</button>
+      <button class="mode" data-mode="erase"><i>⌫</i>消す</button>
+      <button class="mode" data-mode="target"><i>▦</i>配る範囲</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="btnUndo">もどす</button>
+      <button class="btn" id="btnBackup">保存コード</button>
+      <button class="btn" id="btnReset">全部消す</button>
+    </div>
+    <div class="stats"><span id="sPaint">塗った 0マス</span><span id="sTarget">範囲 0マス</span><span id="sArea">約0.00 km²</span></div>
+  </footer>
+</div>
+
+<div id="sheet">
+  <div class="panel">
+    <h2 id="sheetTitle">保存コード</h2>
+    <p id="sheetText">このコードを別の端末に貼り付けると、同じ塗り状態になります。</p>
+    <textarea id="code" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="btn red" id="btnCopy">コピー</button>
+      <button class="btn" id="btnLoad">貼り付けた内容を読み込む</button>
+      <button class="btn" id="btnClose">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var APP_VER = "1";
+  var STORE = "posting-map-v1";
+  var CELL_M = 40;                       // 1マスの一辺(m)
+  var ORIGIN_LAT = 35.40, ORIGIN_LNG = 133.30; // マス番号の原点（固定）
+  var FALLBACK = [35.4300, 133.3500];    // ジム住所が検索できなかった時の仮の中心
+  var GYM_ADDR = "鳥取県米子市車尾6丁目8-59";
+
+  var dLat = CELL_M / 111320;
+  var dLng = CELL_M / (111320 * Math.cos(35.43 * Math.PI / 180));
+
+  var painted = {}, target = {}, strokes = [];
+  var mode = "move", gymLL = null, cur = null;
+
+  function load(){
+    try{
+      var s = JSON.parse(localStorage.getItem(STORE) || "null");
+      if(s){ painted = toSet(s.p); target = toSet(s.t); }
+    }catch(e){}
+  }
+  function save(){
+    try{ localStorage.setItem(STORE, JSON.stringify({p:Object.keys(painted), t:Object.keys(target)})); }catch(e){}
+  }
+  function toSet(a){ var o = {}; (a||[]).forEach(function(k){ o[k] = 1; }); return o; }
+
+  function cellOf(lat, lng){
+    return Math.floor((lat - ORIGIN_LAT) / dLat) + "," + Math.floor((lng - ORIGIN_LNG) / dLng);
+  }
+  function boundsOf(key){
+    var p = key.split(","), i = +p[0], j = +p[1];
+    var s = ORIGIN_LAT + i * dLat, w = ORIGIN_LNG + j * dLng;
+    return [[s, w], [s + dLat, w + dLng]];
+  }
+
+  /* ---------- 地図 ---------- */
+  var map = L.map("map", {
+    center: FALLBACK, zoom: 17, minZoom: 13, maxZoom: 19,
+    doubleClickZoom: false, zoomControl: false, attributionControl: true, tap: true
+  });
+  L.control.zoom({position: "topright"}).addTo(map);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
+
+  var Overlay = L.Layer.extend({
+    onAdd: function(m){
+      this._map = m;
+      var c = this._c = L.DomUtil.create("canvas", "", m.getPane("overlayPane"));
+      c.style.position = "absolute"; c.style.pointerEvents = "none";
+      m.on("move zoom viewreset resize moveend", this.redraw, this);
+      this.redraw();
+    },
+    onRemove: function(m){ m.off("move zoom viewreset resize moveend", this.redraw, this); L.DomUtil.remove(this._c); },
+    redraw: function(){
+      var m = this._map, c = this._c, sz = m.getSize(), dpr = window.devicePixelRatio || 1;
+      var tl = m.containerPointToLayerPoint([0, 0]);
+      L.DomUtil.setPosition(c, tl);
+      c.width = sz.x * dpr; c.height = sz.y * dpr; c.style.width = sz.x + "px"; c.style.height = sz.y + "px";
+      var g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, sz.x, sz.y);
+      var b = m.getBounds();
+      var i0 = Math.floor((b.getSouth() - ORIGIN_LAT) / dLat), i1 = Math.floor((b.getNorth() - ORIGIN_LAT) / dLat);
+      var j0 = Math.floor((b.getWest() - ORIGIN_LNG) / dLng), j1 = Math.floor((b.getEast() - ORIGIN_LNG) / dLng);
+      var z = m.getZoom();
+      function rect(i, j){
+        var a = m.latLngToContainerPoint([ORIGIN_LAT + i * dLat, ORIGIN_LNG + j * dLng]);
+        var d = m.latLngToContainerPoint([ORIGIN_LAT + (i + 1) * dLat, ORIGIN_LNG + (j + 1) * dLng]);
+        return [Math.min(a.x, d.x), Math.min(a.y, d.y), Math.abs(d.x - a.x), Math.abs(d.y - a.y)];
+      }
+      if((i1 - i0 + 1) * (j1 - j0 + 1) > 60000) return;
+      var showGrid = z >= 16, k, r;
+      for(var i = i0; i <= i1; i++){
+        for(var j = j0; j <= j1; j++){
+          k = i + "," + j; var isT = target[k], isP = painted[k];
+          if(!isT && !isP && !showGrid) continue;
+          r = rect(i, j);
+          if(isT){ g.fillStyle = "rgba(17,17,17,.10)"; g.fillRect(r[0], r[1], r[2], r[3]); }
+          if(isP){ g.fillStyle = "rgba(221,11,27,.62)"; g.fillRect(r[0], r[1], r[2] + .6, r[3] + .6); }
+          else if(showGrid){ g.strokeStyle = isT ? "rgba(17,17,17,.35)" : "rgba(0,0,0,.10)"; g.lineWidth = 1; g.strokeRect(r[0] + .5, r[1] + .5, r[2], r[3]); }
+        }
+      }
+      if(gymLL){
+        var p = m.latLngToContainerPoint(gymLL);
+        g.beginPath(); g.arc(p.x, p.y, 9, 0, 6.2832); g.fillStyle = "#fff"; g.fill();
+        g.beginPath(); g.arc(p.x, p.y, 6, 0, 6.2832); g.fillStyle = "#111"; g.fill();
+      }
+    }
+  });
+  var overlay = new Overlay().addTo(map);
+
+  /* ---------- 塗る操作 ---------- */
+  var mapEl = document.getElementById("map");
+  var drawing = false, curStroke = null;
+  function pointToCell(ev){
+    var r = mapEl.getBoundingClientRect();
+    var ll = map.containerPointToLatLng([ev.clientX - r.left, ev.clientY - r.top]);
+    return cellOf(ll.lat, ll.lng);
+  }
+  function apply(key){
+    var store = (mode === "target") ? target : painted;
+    var on = (mode !== "erase");
+    var has = !!store[key];
+    if(on && !has){ store[key] = 1; curStroke.push([key, 1, store === target ? "t" : "p"]); }
+    else if(!on && has){
+      // 消しゴムは塗りと範囲の両方でなく「塗り」だけ消す
+      delete store[key]; curStroke.push([key, 0, "p"]);
+    }
+  }
+  mapEl.addEventListener("pointerdown", function(ev){
+    if(mode === "move") return;
+    drawing = true; curStroke = [];
+    try{ mapEl.setPointerCapture(ev.pointerId); }catch(e){}
+    apply(pointToCell(ev)); overlay.redraw(); ev.preventDefault();
+  });
+  mapEl.addEventListener("pointermove", function(ev){
+    if(!drawing) return;
+    // 指の動きが速くても飛ばないよう補間
+    var evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
+    (evs.length ? evs : [ev]).forEach(function(e){ apply(pointToCell(e)); });
+    overlay.redraw(); ev.preventDefault();
+  });
+  function endDraw(){
+    if(!drawing) return; drawing = false;
+    if(curStroke && curStroke.length){ strokes.push(curStroke); if(strokes.length > 100) strokes.shift(); save(); stats(); }
+    curStroke = null;
+  }
+  mapEl.addEventListener("pointerup", endDraw);
+  mapEl.addEventListener("pointercancel", endDraw);
+  ["gesturestart","gesturechange","gestureend"].forEach(function(n){
+    document.addEventListener(n, function(e){ e.preventDefault(); });
+  });
+
+  /* ---------- モード切り替え ---------- */
+  var toastT;
+  function toast(t){
+    var el = document.getElementById("toast"); el.textContent = t; el.classList.add("on");
+    clearTimeout(toastT); toastT = setTimeout(function(){ el.classList.remove("on"); }, 2200);
+  }
+  var hints = {
+    move: "地図を動かします（塗れません）",
+    paint: "指でなぞって赤く塗ります",
+    erase: "指でなぞって赤を消します",
+    target: "配る予定のマスをなぞって指定します"
+  };
+  function setMode(m){
+    mode = m;
+    document.querySelectorAll(".mode").forEach(function(b){ b.classList.toggle("on", b.dataset.mode === m); });
+    if(m === "move"){ map.dragging.enable(); map.touchZoom.enable(); mapEl.style.touchAction = ""; }
+    else { map.dragging.disable(); map.touchZoom.disable(); mapEl.style.touchAction = "none"; }
+    toast(hints[m]);
+  }
+  document.querySelectorAll(".mode").forEach(function(b){ b.addEventListener("click", function(){ setMode(b.dataset.mode); }); });
+
+  /* ---------- 集計 ---------- */
+  function stats(){
+    var np = Object.keys(painted).length, nt = Object.keys(target).length, both = 0;
+    Object.keys(target).forEach(function(k){ if(painted[k]) both++; });
+    var cellKm2 = (CELL_M * CELL_M) / 1e6;
+    var rate, sub;
+    if(nt > 0){ rate = Math.round(both / nt * 100); sub = "配る範囲のうち"; }
+    else { rate = 0; sub = "「配る範囲」を指定すると％が出ます"; }
+    document.getElementById("rate").textContent = rate;
+    document.getElementById("rateSub").textContent = sub;
+    document.getElementById("sPaint").textContent = "塗った " + np + "マス";
+    document.getElementById("sTarget").textContent = "範囲 " + nt + "マス";
+    document.getElementById("sArea").textContent = "約" + (np * cellKm2).toFixed(2) + " km²";
+  }
+
+  /* ---------- ボタン ---------- */
+  document.getElementById("btnUndo").addEventListener("click", function(){
+    var s = strokes.pop(); if(!s){ toast("もどせる操作がありません"); return; }
+    s.forEach(function(x){
+      var store = x[2] === "t" ? target : painted;
+      if(x[1] === 1) delete store[x[0]]; else store[x[0]] = 1;
+    });
+    save(); stats(); overlay.redraw();
+  });
+
+  var resetArm = 0;
+  document.getElementById("btnReset").addEventListener("click", function(){
+    var btn = this;
+    if(!resetArm){
+      resetArm = 1; btn.textContent = "もう一度押すと全消し"; btn.style.background = "#DD0B1B"; btn.style.color = "#fff";
+      setTimeout(function(){ resetArm = 0; btn.textContent = "全部消す"; btn.style.background = ""; btn.style.color = ""; }, 3000);
+      return;
+    }
+    resetArm = 0; btn.textContent = "全部消す"; btn.style.background = ""; btn.style.color = "";
+    painted = {}; target = {}; strokes = []; save(); stats(); overlay.redraw(); toast("全部消しました");
+  });
+
+  var sheet = document.getElementById("sheet"), codeEl = document.getElementById("code");
+  document.getElementById("btnBackup").addEventListener("click", function(){
+    codeEl.value = "POSTMAP1:" + btoa(unescape(encodeURIComponent(JSON.stringify({p:Object.keys(painted), t:Object.keys(target)}))));
+    sheet.classList.add("on");
+  });
+  document.getElementById("btnClose").addEventListener("click", function(){ sheet.classList.remove("on"); });
+  document.getElementById("btnCopy").addEventListener("click", function(){
+    codeEl.select();
+    var done = function(){ toast("コピーしました"); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(codeEl.value).then(done, function(){ document.execCommand("copy"); done(); });
+    } else { document.execCommand("copy"); done(); }
+  });
+  document.getElementById("btnLoad").addEventListener("click", function(){
+    var v = (codeEl.value || "").trim();
+    if(v.indexOf("POSTMAP1:") !== 0){ toast("保存コードの形式が違います"); return; }
+    try{
+      var o = JSON.parse(decodeURIComponent(escape(atob(v.slice(9)))));
+      painted = toSet(o.p); target = toSet(o.t); strokes = [];
+      save(); stats(); overlay.redraw(); sheet.classList.remove("on"); toast("読み込みました");
+    }catch(e){ toast("読み込めませんでした"); }
+  });
+
+  document.getElementById("btnGym").addEventListener("click", function(){
+    if(gymLL) map.setView(gymLL, 17); else toast("ジムの位置を検索中です");
+  });
+  document.getElementById("btnLoc").addEventListener("click", function(){
+    if(!navigator.geolocation){ toast("この端末では現在地を取れません"); return; }
+    navigator.geolocation.getCurrentPosition(function(p){
+      map.setView([p.coords.latitude, p.coords.longitude], 18);
+    }, function(){ toast("現在地を取れませんでした（位置情報を許可してください）"); }, {enableHighAccuracy:true, timeout:8000});
+  });
+
+  /* ---------- ジム位置（国土地理院の住所検索） ---------- */
+  function findGym(){
+    var url = "https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(GYM_ADDR);
+    fetch(url).then(function(r){ return r.json(); }).then(function(a){
+      if(a && a.length && a[0].geometry){
+        var c = a[0].geometry.coordinates; // [lng, lat]
+        gymLL = L.latLng(c[1], c[0]);
+        map.setView(gymLL, 17); overlay.redraw();
+      } else { toast("ジムの住所が検索できませんでした（仮の位置を表示）"); }
+    }).catch(function(){ toast("ジムの位置を検索できませんでした（仮の位置を表示）"); });
+  }
+
+  /* ---------- 起動 ---------- */
+  load(); stats(); overlay.redraw(); findGym();
+  setTimeout(function(){ map.invalidateSize(); }, 300);
+  window.addEventListener("resize", function(){ map.invalidateSize(); });
+
+  /* ---------- 常に最新を表示（キャッシュ対策） ---------- */
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js?v=" + APP_VER).then(function(reg){
+      reg.update();
+    }).catch(function(){});
+    navigator.serviceWorker.addEventListener("controllerchange", function(){
+      if(!window.__reloaded){ window.__reloaded = 1; location.reload(); }
+    });
+  }
+})();
+</script>
+</body>
+</html>
